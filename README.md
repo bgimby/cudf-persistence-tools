@@ -24,7 +24,7 @@ Run `python A245760.py <start> <end>` to generate terms of A245760, the absolute
 Since this can quickly generate very large sequences, it dumps to a CSV called `start-end.csv` rather than logging to stdout.
 
 ### Datasets
-1-10000000.csv.gz contains a gzipped CSV of the absolute multiplicative persistence of each `n<10 million`, along with `n`'s maximal base.
+`1-10000000.csv.gz` contains a gzipped CSV of the absolute multiplicative persistence of each `n<10 million`, along with `n`'s maximal base.
 
 `A330152.csv` contains the known terms of A330152. `A330152_heuristic.csv` contains a few conjectured following terms in the sequence. These terms definitely have at least the stated absolute persistence, but there may be smaller examples with such persistence that have not been found.
 
