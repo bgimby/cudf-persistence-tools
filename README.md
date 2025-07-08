@@ -26,6 +26,8 @@ Since this can quickly generate very large sequences, it dumps to a CSV called `
 ### Datasets
 1-10000000.csv.gz contains a gzipped CSV of the absolute multiplicative persistence of each `n<10 million`, along with `n`'s maximal base.
 
+`A330152.csv` contains the known terms of A330152. `A330152_heuristic.csv` contains a few conjectured following terms in the sequence. These terms definitely have at least the stated absolute persistence, but there may be smaller examples with such persistence that have not been found.
+
 `persistence_plots.png` shows plots of the absolute persistence and maximal base for `1<=n<100 million`.
 
 ## References
