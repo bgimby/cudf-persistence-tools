@@ -12,6 +12,8 @@ These tools require a GPU with a modern CUDA driver, python3, numpy, pandas, and
 
 ### Tools
 
+There are a number of tools available.
+
 #### A330152.py
 Run `python A330152.py` with no arguments to begin generating terms in the sequence A330152, the smallest numbers with each absolute persistence. Terms will be printed to stdout in CSV format, along with their absolute persistence and their maximal base.
 
@@ -28,6 +30,9 @@ Since this can quickly generate very large sequences, it dumps to a CSV called `
 
 ## References
 http://neilsloane.com/doc/persistence.html
+
 https://cs.uwaterloo.ca/journals/JIS/VOL24/Lamont/lamont5.html
+
 https://oeis.org/A330152
+
 https://oeis.org/A245760
