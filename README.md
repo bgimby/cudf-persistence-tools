@@ -23,6 +23,42 @@ You can adjust the `BLOCK_SIZE` constant at the top of the file to control how m
 Run `python A245760.py <start> <end>` to generate terms of A245760, the absolute persistence and maximal base of each `start<=n<end`.
 Since this can quickly generate very large sequences, it dumps to a CSV called `start-end.csv` rather than logging to stdout.
 
+#### persistence tools module
+
+This module can be run as a standalone program to find the persistence of a number in a base, or can be imported and used in a repl or script to do more complex tasks.
+
+```
+NAME
+    persistence_tools - Various tools for working with persistence.
+
+DESCRIPTION
+    If run as a standalone program, e.g. python persistence_tools.py <num> <base>,
+    will print the persistence of <num> in <base>
+
+FUNCTIONS
+    find_base(n, persistence)
+        Find a base in which n has a given persistence
+
+        Note that this does not check that n is above the cutoff for the given
+        persistence, it'll give possibly incorrect answers
+
+    in_base(n, base)
+        Generate the list of digits of n in a given base.
+
+        Each digit will be represented by an integer which is usually printed in base 10
+
+    multiply_digits(n, base)
+        Apply the sloan map in a given base
+
+    persistence_cutoff(p)
+        Determine the cutoff for persistence p
+
+        if n is greater than the cutoff, then it has absolute persistence at least p.
+
+    print_persistence(n, base)
+        Repeatedly apply the sloan map to n in base b to determine persistence, printing each term
+```
+
 ### Datasets
 `1-10000000.csv.gz` contains a gzipped CSV of the absolute multiplicative persistence of each `n<10 million`, along with `n`'s maximal base.
 
