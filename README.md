@@ -27,6 +27,23 @@ Since this can quickly generate very large sequences, it dumps to a CSV called `
 
 This module can be run as a standalone program to find the persistence of a number in a base, or can be imported and used in a repl or script to do more complex tasks.
 
+`find_base` and `persistence_cutoff` can be used to easily find numbers with large absolute persistences. For an explanation of what they're doing internally, see `Lamont_Conjecture_2_Proof_Sketch.pdf`.
+
+Example:
+```
+>>> from persistence_tools import *
+>>> persistence_cutoff(42)
+2597856311725074932406270678946101892812374015999999957
+>>> bignum = persistence_cutoff(42)
+>>> base = find_base(bignum + 31415, 42)
+>>> find_base(bignum + 31415, 42)
+60415263063373835637355132068513997507264512000000730
+>>> print_persistence(bignum + 31415, base)
+<snipped a bunch of lines showing each iteration of the sloan map>
+Persistence for 2597856311725074932406270678946101892812374016000031372 in base 60415263063373835637355132068513997507264512000000730 is 42
+```
+
+Module documentation:
 ```
 NAME
     persistence_tools - Various tools for working with persistence.
