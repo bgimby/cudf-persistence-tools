@@ -75,10 +75,10 @@ def generate_series(num_terms):
     print("Persistence,Integer,Base")
     # Start with 0 to match OEIS series
     print("0,0,0")
-    last_term = 2
+    last_term = 1
     last_persistence = 1
     last_base = 2
-    iterator = iter(next_term(last_persistence, last_base))
+    iterator = iter(next_term(last_term, last_persistence))
     for i in range(num_terms):
         print(f"{last_persistence},{last_term},{last_base}")
         next_term_row = next(iterator)
