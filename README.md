@@ -83,6 +83,8 @@ FUNCTIONS
 
 `persistence_plots.png` shows plots of the absolute persistence and maximal base for `1<=n<100 million`.
 
+`base_record_breakers.csv` lists the smallest bases that are maximal for larger integers than all smaller bases. That is, if `n` is a record breaking base and its maximal integer is `k`, then if `m<n`, `m` is not the maximal base for any integer `<k`.
+
 ## References
 http://neilsloane.com/doc/persistence.html
 
