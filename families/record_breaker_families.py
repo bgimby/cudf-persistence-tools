@@ -5,15 +5,15 @@ from base_families import BASE_FAMILIES
 import itertools
 import operator
 import functools
-import numba
+#import numba
 import numpy as np
-from numba.core import types
-from numba.typed import List
+#from numba.core import types
+#from numba.typed import List
 import more_itertools
 from toolz import itertoolz
 from collections import defaultdict
 
-@numba.jit
+#@numba.jit
 def divisors(n):
     ret = [1]
     i = 2
@@ -23,7 +23,7 @@ def divisors(n):
         i = i+1
     return ret
 
-@numba.jit
+#@numba.jit
 def can_be_transformed(first, second, base):
     if first > second:
         tmp = first
@@ -98,7 +98,7 @@ def get_valid_stars(ones: list[int], stars: list[int], base: int) -> list[int]:
             if is_good_combo(combo, base, stars, onesprod, ones):
                 yield combo
 
-@numba.njit('(int64, int64)')
+#@numba.njit('(int64, int64)')
 def combCount(n, r):
     if r < 0:
         return 0
@@ -110,7 +110,7 @@ def combCount(n, r):
         res //= (i + 1)
     return res
 
-@numba.njit(inline='always')
+#@numba.njit(inline='always')
 def genComb_generic(arr, r):
     n = arr.size
     out = np.empty((combCount(n, r), r), dtype=arr.dtype)
@@ -216,6 +216,14 @@ def lists_to_string(ones, stars):
         sorted_digit_strings.append(digit_to_string[digit])
     return " ".join(sorted_digit_strings)
 
+def lists_to_string__multistar(ones, stars):
+    ones_str = " ".join(str(one) for one in ones)
+    star_strs = []
+    for star in stars:
+        star_strs.append("(" + " ".join(str(s) for s in star) + ")*")
+    stars_str = " ".join(star_strs)
+    return " ".join((ones_str, stars_str))
+
 def possible_record_breakers(base: int) -> list[int]:
     """Get all valid strings"""
     ret = []
@@ -236,6 +244,12 @@ def generate_from(ones, stars) -> list[int]:
     for i in range(10_000):
         for suffix in itertools.combinations_with_replacement(stars, i):
             yield prefix + [int(j) for j in suffix]
+
+def generate_from__multistar(ones, stars) -> list[int]:
+    prefix = [int(i) for i in ones]
+    for i in range(10_000):
+        for suffix in itertools.combinations_with_replacement(stars, i):
+            yield prefix + [int(j) for l in suffix for j in l]
 
 def get_persistence(num: int, base: int) -> int:
     persistence = 0
@@ -260,10 +274,101 @@ def list_to_int(num: list[int], base: int) -> int:
 def sort_key(l):
     return 1_000_000*len(l) + sum(l)
 
+def get_ring_size(star, base, onesmod):
+    ret = 1
+    val = onesmod
+    seen = set()
+    while val not in seen:
+        seen.add(val)
+        val = (val * star) % base
+        ret += 1
+    return ret
+
+def expand_string(ones, stars, base, max_power):
+    # If n % b^k < b^(k-1), then kth digit of n will be zero
+    # so n can't have persistence > 2
+
+    ones_mod = functools.reduce(operator.mul, ones, 1) % base ** max_power
+    valid_ones = []
+
+    if len(stars) == 1:
+        # look for string lengths where modulus is large enough
+        star = stars[0]  
+        size = get_ring_size(star, base ** max_power, ones_mod)
+        for i in range(size):
+            if all(ones_mod * star ** i % base ** power > base ** (power - 1) for power in range(2, max_power + 1)):
+                valid_ones.append([star]*i)
+        minstar = [star] * size
+        return [(ones + s, [minstar]) for s in valid_ones]
+
+    # More than 1 star
+    ret = []
+    largest = max(get_ring_size(star, base ** max_power, n) for n in range(base ** max_power) for star in stars) 
+    for i in range(largest):
+        for combo in itertools.combinations_with_replacement(stars, i):
+            combomod = ones_mod * functools.reduce(operator.mul, combo, 1) % base ** max_power
+            if any(combomod % base ** power < base ** (power - 1) for power in range(2, max_power + 1)):
+                continue
+            minstars = []
+            should_continue = False
+            for star in stars:
+                size = get_ring_size(star, base ** max_power, combomod)
+                if combo.count(star) > size:
+                    should_continue = True
+                minstars.append([star] * size)
+            if should_continue:
+                continue
+            ret.append((ones + list(combo), minstars))
+    return ret
+
+def expand_strings(strings, base, max_power):
+    try:
+        ret = []
+        for string in strings:
+            ret.extend(expand_string(string[0], string[1], base, max_power))
+        return ret
+    except:
+        import pdb;pdb.post_mortem()
+
+def find_record_breakers__multistar(base: int, max_power: int):
+    possible_strings = expand_strings(BASE_FAMILIES[base], base, max_power)
+    max_persistence = 0
+    last = 0
+    max_length = 0
+    printed_length_last = False
+    print("Possible record breaker strings")
+    [print(lists_to_string__multistar(possible[0], possible[1])) for possible in possible_strings]
+    print("Number of strings:", len(possible_strings))
+    grouped_iterator = itertoolz.merge_sorted(*(
+        generate_from__multistar(possible[0], possible[1])
+        for possible in possible_strings
+    ), key=sort_key)
+    for l in grouped_iterator:
+        if (persistence := get_persistence(list_to_int(l, base), base)) > max_persistence:
+            max_persistence = persistence
+            if printed_length_last:
+                print("\n", end="")
+            printed_length_last = False
+            print(f"{persistence}: {list_to_int(sorted(list(l)), base)} {sorted(list(l))}")
+            last = list_to_int(sorted(list(l)), base)
+        if (persistence == max_persistence) and (i := list_to_int(sorted(list(l)), base)) < last:
+            last = i
+            if printed_length_last:
+                print("\n", end="")
+            printed_length_last = False
+            print(f"{persistence}: {list_to_int(sorted(list(l)), base)} {sorted(list(l))}")
+        if len(l) > max_length:
+            max_length = len(l)
+            printed_length_last = True
+            print(f"Searching strings of length: {max_length}", end='\r')
+#        if len(l) < max_length:
+#            print("Borken")
+
 def find_record_breakers(base: int) -> None:
     max_persistence = 0
     last = 0
     max_length = 0
+    printed_length_last = False
     possible_strings = list(
         a for a in all_valid_strings(base)
         if is_valid(a[0], a[1], base)
@@ -277,13 +382,21 @@ def find_record_breakers(base: int) -> None:
     for l in grouped_iterator:
         if (persistence := get_persistence(list_to_int(l, base), base)) > max_persistence:
             max_persistence = persistence
+            if printed_length_last:
+                print("\n", end="")
+            printed_length_last = False
             print(f"{persistence}: {list_to_int(sorted(list(l)), base)} {sorted(list(l))}")
             last = list_to_int(sorted(list(l)), base)
         if (persistence == max_persistence) and (i := list_to_int(sorted(list(l)), base)) < last:
             last = i
+            if printed_length_last:
+                print("\n", end="")
+            printed_length_last = False
             print(f"{persistence}: {list_to_int(sorted(list(l)), base)} {sorted(list(l))}")
         if len(l) > max_length:
             max_length = len(l)
+            printed_length_last = True
+            print(f"Searching strings of length: {max_length}", end='\r')
         if len(l) < max_length:
             print("Borken")
 
@@ -309,6 +422,9 @@ def find_record_breakers__precomputed(base: int) -> None:
             last = list_to_int(sorted(list(l)), base)
         if (persistence == max_persistence) and (i := list_to_int(sorted(list(l)), base)) < last:
             last = i
+            if printed_length_last:
+                print("\n", end="")
+            printed_length_last = False
             print(f"{persistence}: {list_to_int(sorted(list(l)), base)} {sorted(list(l))}")
         if len(l) > max_length:
             max_length = len(l)
@@ -318,4 +434,4 @@ def find_record_breakers__precomputed(base: int) -> None:
             print("Borken")
 
 if __name__ == "__main__":
-    print(possible_record_breakers(int(sys.argv[-1])))
+    print(find_record_breakers(int(sys.argv[-1])))

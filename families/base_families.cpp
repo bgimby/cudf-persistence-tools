@@ -1,6 +1,7 @@
 #include <map>
 
-typedef std::vector<std::pair<std::vector<uint32_t>, std::vector<uint32_t>>> family;
+typedef std::pair<std::vector<uint32_t>, std::vector<uint32_t>> pstring;
+typedef std::vector<pstring> family;
 
 std::map<uint32_t, family> BASE_FAMILIES = {
     {3, {{{}, {2}}}},
@@ -36,13 +37,15 @@ std::map<uint32_t, family> BASE_FAMILIES = {
         }
     },
     {10, {
-            {{}, {5, 7, 8, 9, 10}},
-            {{2}, {7, 8, 9, 10}},
-            {{3}, {5, 7, 8, 9, 10}},
-            {{4}, {7, 8, 9, 10}},
-            {{6}, {7, 8, 9, 10}},
-            {{2, 6}, {7, 8, 9, 10}},
-         }
+            {{}, {5, 7, 9}},
+            {{}, {7, 8, 9}},
+            {{2}, {7, 8, 9}}, 
+            {{3}, {5, 7, 9}}, 
+            {{3}, {7, 8, 9}}, 
+            {{4}, {7, 8, 9}}, 
+            {{6}, {7, 8, 9}}, 
+            {{2, 6}, {7, 8, 9}}
+        }
     },
     {11, {
             {{}, {5, 7, 8, 9, 10}},
