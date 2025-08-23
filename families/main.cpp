@@ -62,6 +62,7 @@ void process_combo(std::vector<uint32_t>& combo, uint32_t base) {
     //std::cout << "Persistence: " << persistence << std::endl;
 
     if (persistence >= MAX_PERSISTENCE) {
+        const std::lock_guard<std::mutex> l(LOCK);
         std::sort(combo.begin(), combo.end());
         bigint num_in_base = value_in_base(combo, base);
         if (persistence > MAX_PERSISTENCE || num_in_base < MAX_INT) {
@@ -229,20 +230,22 @@ void expand_string(expanded_family& fam, const pstring& s, uint32_t base, uint32
     idempotence_cache.resize((1 + *std::max_element(s.second.begin(), s.second.end())) * basepow);
     for(auto& i : s.second) {
         maxes.push_back(max_idempotence(i, basepow) - 1);
-        std::cout << "Star: " << i << " " << maxes[maxes.size()-1] + 1 << std::endl;;
+        //std::cout << "Star: " << i << " " << maxes[maxes.size()-1] + 1 << std::endl;;
     }
     int sum = std::accumulate(maxes.begin(), maxes.end(), 0);
     std::vector<int> used(maxes.size(), 0);
 
     // loop through and create valid strings
     for(size_t i = 0; i <= sum; ++i) {
-        std::cout << i << "/" << sum << "\r";
+        {
+            const std::lock_guard<std::mutex> l(LOCK);
+            std::cout << i << "/" << sum << "\r";
+        }
         expanded_string current_combo;
         current_combo.first = s.first;
         current_combo.first.resize(current_combo.first.size() + i);
         generate_string_combos(fam, current_combo, s, maxes, used, base, max_power, current_combo.first.size(), 0, s.first.size());
     }
-    std::cout << std::endl;
 }
 
 expanded_family expand_base_family(const family& fam, uint32_t base, uint32_t max_power) {
@@ -251,7 +254,7 @@ expanded_family expand_base_family(const family& fam, uint32_t base, uint32_t ma
         expand_string(ret, s, base, max_power);
     };
     std::for_each(std::execution::par, fam.cbegin(), fam.cend(), expand);
-    std::cout << "Total strings: " << fam.size() << std::endl;
+    std::cout << "Total strings: " << ret.size() << std::endl;
     return std::move(ret);
 }
 
