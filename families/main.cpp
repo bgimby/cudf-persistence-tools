@@ -5,6 +5,8 @@
 #include <base_families.cpp>
 #include <cstdlib>
 #include <execution>
+#include <atomic>
+#include <mutex>
 
 
 using namespace boost::multiprecision;
@@ -12,18 +14,17 @@ typedef uint512_t bigint;
 typedef std::pair<std::vector<uint32_t>, std::vector<std::pair<uint32_t, uint32_t>>> expanded_string;
 typedef std::vector<expanded_string> expanded_family;
 
-uint32_t MAX_PERSISTENCE = 0;
+std::atomic_int MAX_PERSISTENCE = 0;
 bigint MAX_INT = 0;
 size_t MAX_LEN = 100;
-bigint WORK_MULT = 0;
-bigint WORK_MULT_RET = 0;
 bool printed_return = false;
+std::mutex LOCK;
 
-inline void digit_multiply(const bigint& num, uint32_t base) {
-    WORK_MULT = num;
-    WORK_MULT_RET = 1;
+inline void digit_multiply(bigint& num, uint32_t base) {
+    bigint WORK_MULT = num;
+    num = 1;
     while (WORK_MULT > 1) {
-        WORK_MULT_RET *= WORK_MULT % base;
+        num *= WORK_MULT % base;
         WORK_MULT /= base;
     }
 }
@@ -40,7 +41,7 @@ bigint value_in_base(const std::vector<uint32_t>& num, uint32_t base) {
 
 inline uint32_t get_persistence(const bigint& num, uint32_t base) {
     uint32_t persistence = 1;
-    WORK_MULT_RET = num;
+    bigint WORK_MULT_RET = num;
     while (WORK_MULT_RET >= base) {
         digit_multiply(WORK_MULT_RET, base);
         persistence += 1;
@@ -61,6 +62,7 @@ void process_combo(std::vector<uint32_t>& combo, uint32_t base) {
     //std::cout << "Persistence: " << persistence << std::endl;
 
     if (persistence >= MAX_PERSISTENCE) {
+        std::sort(combo.begin(), combo.end());
         bigint num_in_base = value_in_base(combo, base);
         if (persistence > MAX_PERSISTENCE || num_in_base < MAX_INT) {
             if (printed_return) {
@@ -80,6 +82,27 @@ void process_combo(std::vector<uint32_t>& combo, uint32_t base) {
     }
 }
 
+void generate_combos_expanded(
+    const std::vector<std::pair<uint32_t, uint32_t>>& data,
+    uint32_t length,
+    uint32_t idx,
+    size_t last_idx,
+    std::vector<uint32_t>& combo,
+    uint32_t base) {
+    if (idx >= length) {
+        process_combo(combo, base);
+        return;
+    }
+    for (size_t i=last_idx; i<data.size(); i++){
+        if(idx + data[i].second <= length) {
+            for(size_t j = idx; j < idx + data[i].second; ++j) {
+                combo[j] = data[i].first;
+            }
+            generate_combos_expanded(data, length, idx + data[i].second, i, combo, base);
+        }
+    }
+}
+
 void generate_combos(
     const std::vector<uint32_t>& data,
     uint32_t length,
@@ -95,17 +118,11 @@ void generate_combos(
         combo[idx] = data[i];
         generate_combos(data, length, idx + 1, i, combo, base);
     }
-//    for (auto& i : data) {
-//        if (i < last_val) {
-//            continue;
-//        }
-//        combo[idx] = i;
-//        //std::cout << start_idx << i << length << "l" << std::endl;
-//        generate_combos(data, length, idx + 1, i, combo);
-//    }
 }
 
-int get_idempotence(uint32_t i, uint32_t base, uint32_t onesmod) {
+std::vector<int> idempotence_cache(0, 0);
+
+inline int get_idempotence(uint32_t i, uint32_t base, uint32_t onesmod) {
     int ret = 0;
     uint32_t current = onesmod;
     std::vector<int> last_seen(base, 0);
@@ -127,13 +144,12 @@ int get_idempotence(uint32_t i, uint32_t base, uint32_t onesmod) {
 int max_idempotence(uint32_t i, uint32_t base) {
     int max = 0;
     for(uint32_t j = 1; j < base; ++j) {
-        max = std::max(max, get_idempotence(i, base, j));
+        int idem = get_idempotence(i, base, j);
+        idempotence_cache[i * base + j] = idem;
+        max = std::max(max, idem);
     }
     return max;
 }
-
-int COMBO_COUNT = 0;
-int TOTAL_COUNT = 0;
 
 void process_string_combo(
     expanded_family& ret,
@@ -143,35 +159,31 @@ void process_string_combo(
     uint32_t base, 
     uint32_t max_power
 ) {
-    TOTAL_COUNT++;
     uint32_t onesmod = 1;
     uint32_t basepow = std::pow(base, max_power);
-    bool should_skip = false;
     for(auto& i : combo.first) {
         onesmod = onesmod * i % basepow;
         //std::cout << i << " ";
     }
     for(size_t i = 0; i < original_string.second.size(); ++i) {
-        int idempotence = get_idempotence(original_string.second[i], basepow, onesmod);
+        int idempotence = idempotence_cache[original_string.second[i] * basepow + onesmod];
         if(idempotence > 0) {
             combo.second.emplace_back(original_string.second[i], idempotence);
         }
         if(used[i] > idempotence) {
-            should_skip = true;
+            combo.second.resize(0);
+            return;
         }
         //std::cout << "(" << original_string.second[i] << "*" << idempotence << ")*";
     }
     for(uint32_t power = 2; power <= max_power; ++power) {
         if(onesmod % uint32_t(std::pow(base, power)) < std::pow(base, power - 1)) {
-            should_skip = true;
+            combo.second.resize(0);
+            return;
         }
     }
-    if(should_skip) {
-        //std::cout << "SKIPPED";
-    } else {
-        COMBO_COUNT++;
-        ret.push_back(combo);
-    }
+    const std::lock_guard<std::mutex> l(LOCK);
+    ret.push_back(combo);
     //std::cout << std::endl;
     combo.second.resize(0);
 }
@@ -214,6 +226,7 @@ void expand_string(expanded_family& fam, const pstring& s, uint32_t base, uint32
     
     // Construct list of max idempotences for each star
     std::vector<int> maxes;
+    idempotence_cache.resize((1 + *std::max_element(s.second.begin(), s.second.end())) * basepow);
     for(auto& i : s.second) {
         maxes.push_back(max_idempotence(i, basepow) - 1);
         std::cout << "Star: " << i << " " << maxes[maxes.size()-1] + 1 << std::endl;;
@@ -234,17 +247,17 @@ void expand_string(expanded_family& fam, const pstring& s, uint32_t base, uint32
 
 expanded_family expand_base_family(const family& fam, uint32_t base, uint32_t max_power) {
     expanded_family ret;
-    for(auto& s : fam) {
+    auto expand = [&](const pstring& s) {
         expand_string(ret, s, base, max_power);
-    }
-    std::cout << "Total unskipped: " << COMBO_COUNT << std::endl;
-    std::cout << "Total checked: " << TOTAL_COUNT << std::endl;
+    };
+    std::for_each(std::execution::par, fam.cbegin(), fam.cend(), expand);
+    std::cout << "Total strings: " << fam.size() << std::endl;
     return std::move(ret);
 }
 
 
 void print_combos(uint32_t base) {
-    auto families = BASE_FAMILIES[base];
+    const auto& families = BASE_FAMILIES[base];
 
     for (size_t i = 1; i < MAX_LEN; i++) {
         std::cout << "Generating combinations of length " << i << "\r";
@@ -260,7 +273,7 @@ void print_combos(uint32_t base) {
             }
             generate_combos(vec, i, k, 0, current_combo, base);
         };
-        std::for_each(std::execution::par_unseq, families.cbegin(), families.cend(), generate);
+        std::for_each(std::execution::par, families.cbegin(), families.cend(), generate);
     }
 }
 
@@ -268,26 +281,35 @@ void print_combos_expanded(uint32_t base, const expanded_family& fam) {
     for(size_t i = 1; i < MAX_LEN; i++) {
         std::cout << "Generating combinations of length " << i << "\r";
         printed_return = true;
-        auto generate = [&](const std::pair<std::vector<uint32_t>, std::vector<uint32_t>>& pair) {
+        auto generate = [&](const expanded_string& pair) {
             auto& ones = pair.first;
-            auto& vec = pair.second;
+            auto& stars = pair.second;
             // generate combinations of length i
             std::vector<uint32_t> current_combo(i, 0);
+            if(ones.size() > i) {
+                return;
+            }
             size_t k=0;
-            for (; k < std::min(i, ones.size()); ++k) {
+            for (; k < ones.size(); ++k) {
                 current_combo[k] = ones[k];
             }
-            generate_combos(vec, i, k, 0, current_combo, base);
+            generate_combos_expanded(stars, i, k, 0, current_combo, base);
         };
-        std::for_each(std::execution::par_unseq, fam.cbegin(), fam.cend(), generate);
+        std::for_each(std::execution::par, fam.cbegin(), fam.cend(), generate);
     }
 }
 
 int main(int argc, char** argv) {
-    uint32_t base = atoi(argv[argc - 2]);
+    uint32_t max_power = atoi(argv[argc - 2]);
+    uint32_t base = atoi(argv[argc - 3]);
     MAX_LEN = atoi(argv[argc - 1]);
     std::cout.setf( std::ios_base::unitbuf );
     std::cout << base << std::endl;
-    expand_base_family(BASE_FAMILIES[base], base, MAX_LEN);
+    if(max_power == 1) {
+        print_combos(base);
+    } else {
+        const auto& families = expand_base_family(BASE_FAMILIES[base], base, max_power);
+        print_combos_expanded(base, families);
+    }
     return 0;
 }
